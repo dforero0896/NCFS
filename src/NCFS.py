@@ -8,6 +8,20 @@
 from tkinter import *
 from tkinter.messagebox import showinfo
 class Application(Frame):
+    def showDoneMsg(self,message):
+        popUp = Toplevel()
+        popUp.title('Hecho')
+        doneMsgLabel = Label(popUp, text=message)
+        doneMsgLabel.grid(row=2, column=2)
+        closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
+        closeButton.grid(row=3, column=2)
+    def showErrorMsg(self,message):
+        popUp = Toplevel()
+        popUp.title('Error')
+        errorMsgLabel = Label(popUp, text=message)
+        errorMsgLabel.grid(row=2, column=2)
+        closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
+        closeButton.grid(row=3, column=2)
     def clearNameField(self):
         self.NOMBRE.delete(0,END)
     def createConnectionToDB(self):
@@ -26,7 +40,7 @@ class Application(Frame):
                 raise NameError('ERROR: El paciente no existe en la base de datos')
             datosPaciente=df[df['Nombre'].str.contains(nStr, na=False)].reset_index(drop=True)
             datosPaciente['Cedula'][0]
-            archivoHistorias = open(self.SRCDIR+"historia_"+nStr.replace(' ','')+".txt", "w")
+            archivoHistorias = open(self.SRCDIR+"historia_"+nStr.replace(' ','')+".txt", "w", encoding='latin-1')
             archivoHistorias.write(u'Historia del paciente %s, ID %i:\n'%(nStr, datosPaciente['Cedula'][0]))
             fechas = datosPaciente['Fecha'].values
             tratamientos = datosPaciente['Tratamiento'].values
@@ -58,30 +72,16 @@ class Application(Frame):
                 finalHist.write(line)
             finalHist.close()
             import subprocess
-            subprocess.check_call(['pdflatex', '-output-directory', '../HistoriasPacientes', finalHist.name])
+
+            #subprocess.check_call(['pdflatex', '-output-directory', '../HistoriasPacientes', finalHist.name])
+            subprocess.check_call(['pdflatex', finalHist.name])
             #subprocess.check_call(['cleanSource.bat'])
-
-
-            popUp = Toplevel()
-            popUp.title('Hecho')
-            doneMsgLabel = Label(popUp, text='La historia ha sido exportada al archivo:\n '+finalHist.name.replace('tex', 'pdf'))
-            doneMsgLabel.grid(row=2, column=2)
-            closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
-            closeButton.grid(row=3, column=2)
+            subprocess.check_call(['./cleanSource.sh'])
+            self.showDoneMsg('La historia ha sido exportada al archivo:\n '+finalHist.name.replace('tex', 'pdf'))
         except NameError as ne:
-            popUp = Toplevel()
-            popUp.title('Error')
-            errorMsgLabel = Label(popUp, text=ne.args[0])
-            errorMsgLabel.grid(row=2, column=2)
-            closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
-            closeButton.grid(row=3, column=2)
+            self.showErrorMsg(ne.args[0])
         except(KeyError,IndexError):
-            popUp = Toplevel()
-            popUp.title('Error')
-            errorMsgLabel = Label(popUp, text=u'ERROR: El paciente no existe.')
-            errorMsgLabel.grid(row=2, column=2)
-            closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
-            closeButton.grid(row=3, column=2)
+            self.showErrorMsg(u'ERROR: El paciente no existe.')
 
     def getFormulaFromName(self):
         df = self.createConnectionToDB()
@@ -118,29 +118,15 @@ class Application(Frame):
                 finalFormula.write(line)
             finalFormula.close()
             import subprocess
-            #subprocess.check_call(['latex', finalFormula.name])
-            subprocess.check_call(['pdflatex', '-output-directory', '../FormulasPacientes', finalFormula.name])
+            #subprocess.check_call(['pdflatex', '-output-directory', '../FormulasPacientes', finalFormula.name])
+            subprocess.check_call(['pdflatex', finalFormula.name])
             #subprocess.check_call(['cleanSource.bat'])
-            popUp = Toplevel()
-            popUp.title('Hecho')
-            doneMsgLabel = Label(popUp, text='La formula ha sido exportada al archivo:\n '+finalFormula.name.replace('tex','pdf'))
-            doneMsgLabel.grid(row=2, column=2)
-            closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
-            closeButton.grid(row=3, column=2)
+            subprocess.check_call(['./cleanSource.sh'])
+            self.showDoneMsg('La formula ha sido exportada al archivo:\n '+finalFormula.name.replace('tex','pdf'))
         except IndexError as ie:
-            popUp = Toplevel()
-            popUp.title('Error')
-            errorMsgLabel = Label(popUp, text=ie.args[0])
-            errorMsgLabel.grid(row=2, column=2)
-            closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
-            closeButton.grid(row=3, column=2)
+            self.showErrorMsg(ie.args[0])
         except NameError as ne:
-            popUp = Toplevel()
-            popUp.title('Error')
-            errorMsgLabel = Label(popUp, text=ne.args[0])
-            errorMsgLabel.grid(row=2, column=2)
-            closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
-            closeButton.grid(row=3, column=2)
+            self.showErrorMsg(ne.args[0])
 
 
 

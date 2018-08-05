@@ -29,7 +29,7 @@
 \renewcommand{\headrulewidth}{1pt}
 \renewcommand{\footrulewidth}{0.5pt}
 \newcommand{\patient}{\vspace*{-1.5cm}
-	\large\textsc{${NombrePaciente}\\}
+	\large\textsc{NombrePaciente\\}}
 \makeatletter
 \def\headrule{\nointerlineskip\if@fancyplain\let\headrulewidth\plainheadrulewidth\fi%
 	{\rule{0.67\headwidth}{\headrulewidth}} \vskip-\headrulewidth}

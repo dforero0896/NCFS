@@ -59,7 +59,7 @@ class Application(Frame):
             finalHist.close()
             import subprocess
             subprocess.check_call(['pdflatex', '-output-directory', '../HistoriasPacientes', finalHist.name])
-            #subprocess.check_call(['cleanSource.bat'])
+            subprocess.check_call(['cleanSource.bat'])
 
 
             popUp = Toplevel()
@@ -120,7 +120,7 @@ class Application(Frame):
             import subprocess
             #subprocess.check_call(['latex', finalFormula.name])
             subprocess.check_call(['pdflatex', '-output-directory', '../FormulasPacientes', finalFormula.name])
-            #subprocess.check_call(['cleanSource.bat'])
+            subprocess.check_call(['cleanSource.bat'])
             popUp = Toplevel()
             popUp.title('Hecho')
             doneMsgLabel = Label(popUp, text='La formula ha sido exportada al archivo:\n '+finalFormula.name.replace('tex','pdf'))

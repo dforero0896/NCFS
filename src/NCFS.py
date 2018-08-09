@@ -132,10 +132,10 @@ class Application(Frame):
             finalHist.close()
             import subprocess
 
-            #subprocess.check_call(['pdflatex', '-output-directory', '../HistoriasPacientes', finalHist.name])
-            subprocess.check_call(['pdflatex', finalHist.name])
-            #subprocess.check_call(['cleanSource.bat'])
-            subprocess.check_call(['./cleanSource.sh'])
+            subprocess.check_call(['pdflatex', '-output-directory', '../HistoriasPacientes', finalHist.name])
+            #subprocess.check_call(['pdflatex', finalHist.name])
+            subprocess.check_call(['cleanSource.bat'])
+            #subprocess.check_call(['./cleanSource.sh'])
             self.showDoneMsg('La historia ha sido exportada al archivo:\n '+finalHist.name.replace('tex', 'pdf'))
         except NameError as ne:
             self.showErrorMsg(ne.args[0])
@@ -181,10 +181,10 @@ class Application(Frame):
                 finalFormula.write(line)
             finalFormula.close()
             import subprocess
-            #subprocess.check_call(['pdflatex', '-output-directory', '../FormulasPacientes', finalFormula.name])
-            subprocess.check_call(['pdflatex', finalFormula.name])
-            #subprocess.check_call(['cleanSource.bat'])
-            subprocess.check_call(['./cleanSource.sh'])
+            subprocess.check_call(['pdflatex', '-output-directory', '../FormulasPacientes', finalFormula.name])
+            #subprocess.check_call(['pdflatex', finalFormula.name])
+            subprocess.check_call(['cleanSource.bat'])
+            #subprocess.check_call(['./cleanSource.sh'])
             self.showDoneMsg('La formula ha sido exportada al archivo:\n '+finalFormula.name.replace('tex','pdf'))
         except IndexError as ie:
             self.showErrorMsg(ie.args[0])

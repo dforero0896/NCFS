@@ -18,7 +18,7 @@ class Consulta(persistent.Persistent):
     motivo ='DESCONOCIDO'
     diagnostico = 'DESCONOCIDO'
     tratamiento = 'NINGUNO'
-
+    formula = 'NINGUNO'
     def __init__(self):
         self.fecha = str(date.today())
         self.revisionSistemas = PersistentMapping({'cabeza y cuello':'', u'tórax, respiratorio':'', 'abdomen, digestivo':'', 'genitourinario':'', 'extremidades, oesteoarticular':'', u'neurológico':'', 'generales':'', 'mentales':''})
@@ -107,7 +107,6 @@ class Application(Frame):
                 archivoHistorias.write(u'\subsection*{Examen Físico}')
                 for key, value in consulta.examenFisico.items():
                     archivoHistorias.write(u'\\textbf{%s:} %s\n'%(key.capitalize(), value.capitalize()))
-                archivoHistorias.write(u'\subsection*{Chequeo Órganos}')
                 for key, value in consulta.cheqOrganos.items():
                     archivoHistorias.write(u'\\textbf{%s:} %s\n'%(key.capitalize(), value.capitalize()))
                 archivoHistorias.write(u'\\textbf{Diagnóstico:} %s\n'%consulta.diagnostico)
@@ -161,7 +160,7 @@ class Application(Frame):
                 raise IndexError(u'Aún no existen fórmulas para el paciente.')
             fechas = [datetime.strptime(dstr, '%Y-%m-%d') for dstr in consultas.keys()]
             ultimaConsulta = max(fechas)
-            ultimaFormula = consultas[str(ultimaConsulta.date())].tratamiento
+            ultimaFormula = consultas[str(ultimaConsulta.date())].formula
             archivoFormulas.write(ultimaFormula)
             archivoFormulas.close()
 
@@ -261,25 +260,27 @@ class Application(Frame):
         popUp.title('Adicionar Antecedentes para %s'%paciente.datosPersonales['nombre'])
         datoLabels = [Label(popUp, text=dato.capitalize()) for dato in datos]
         datoSpaces = {dato:Entry(popUp) for dato in datos}
-        [label.grid(row=2+i, column=1) for i, label in enumerate(datoLabels)]
-        [space.grid(row=2+i, column=3) for i, space in enumerate(datoSpaces.values())]
+        [label.grid(row=2+i, column=2) for i, label in enumerate(datoLabels)]
+        [space.grid(row=2+i, column=4) for i, space in enumerate(datoSpaces.values())]
         passFunc = lambda : self.adicionarAntecedentes(datoSpaces, paciente)
         adicionarAntecedentesButton = Button(popUp, text='Adicionar', command = passFunc)
-        adicionarAntecedentesButton.grid(row = len(datos)+2, column = 1)
+        adicionarAntecedentesButton.grid(row = len(datos)+2, column = 2)
         closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
-        closeButton.grid(row=len(datos)+2, column=3)
+        closeButton.grid(row=len(datos)+2, column=4)
     def guardarConsulta(self, consulta, info):
         motivo = info[0]
         consulta.motivo = motivo
         toFill = [consulta.revisionSistemas, consulta.examenFisico, consulta.cheqOrganos]
-        for dic, targ in zip(info[1:-2], toFill):
+        for dic, targ in zip(info[1:-3], toFill):
             dictGet = {key:dic[key].get(1.0, END) for key in dic.keys()}
             for key, value in dictGet.items():
                 targ[key] = value
-        diagnost = info[-2]
-        tratam = info[-1]
+        diagnost = info[-3]
+        tratam = info[-2]
+        formula = info[-1]
         consulta.diagnostico = diagnost
         consulta.tratamiento = tratam
+        consulta.formula = formula
 
         transaction.commit()
         self.showDoneMsg(u'La consulta se ha guardado con éxito.\nPuede cerrar la ventana')
@@ -318,8 +319,6 @@ class Application(Frame):
             [space.grid(row=4+i, column=4) for i, space in enumerate(eFSpaces.values())]
 
 
-            cOTitle = Label(popUp, text = u'Chequeo Órganos', font='Helvetica 18 bold')
-            cOTitle.grid(row=3, column = 5)
             cOLabels = [Label(popUp, text=dato.capitalize()) for dato in cO]
             cOSpaces = {dato:ScrolledText(popUp, height=2, width=30) for dato in cO}
             [label.grid(row=4+i, column=5) for i, label in enumerate(cOLabels)]
@@ -333,9 +332,13 @@ class Application(Frame):
             tratamLabel.grid(row = 5 + len(rS), column = 3)
             tratamSpace = ScrolledText(popUp, height=2, width=30)
             tratamSpace.grid(row = 5 + len(rS), column = 4)
-            toDo = lambda: paciente.historia.adicionarConsulta(self.guardarConsulta(consulta, [motivoSpace.get(1.0, END), rSSpaces, eFSpaces, cOSpaces, diagSpace.get(1.0, END), tratamSpace.get(1.0, END)]))
+            formulLabel = Label(popUp, text = 'Fórmula', font='Helvetica 18 bold')
+            formulLabel.grid(row = 5 + len(rS), column = 5)
+            formulSpace = ScrolledText(popUp, height=2, width=30)
+            formulSpace.grid(row = 5 + len(rS), column = 6)
+            toDo = lambda: paciente.historia.adicionarConsulta(self.guardarConsulta(consulta, [motivoSpace.get(1.0, END), rSSpaces, eFSpaces, cOSpaces, diagSpace.get(1.0, END), tratamSpace.get(1.0, END), formulSpace.get(1.0, END)]))
             allSave = Button(popUp, text='Guardar', command = toDo, font='Helvetica 18 bold')
-            allSave.grid(row= 5 + len(rS), column = 5)
+            allSave.grid(row= 6 + len(rS), column = 4)
         except NameError as ne:
             self.showErrorMsg(ne.args[0])
 

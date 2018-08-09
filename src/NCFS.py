@@ -7,7 +7,56 @@
 
 from tkinter import *
 from tkinter.messagebox import showinfo
+import ZODB, ZODB.FileStorage
+from BTrees.OOBTree import BTree
+from ZODB.PersistentMapping import PersistentMapping
+import persistent
+import transaction
+from tkinter.scrolledtext import ScrolledText
+from datetime import *
+class Consulta(persistent.Persistent):
+    motivo ='DESCONOCIDO'
+    diagnostico = 'DESCONOCIDO'
+    tratamiento = 'NINGUNO'
+
+    def __init__(self):
+        self.fecha = str(date.today())
+        self.revisionSistemas = PersistentMapping({'cabeza y cuello':'', u'tórax, respiratorio':'', 'abdomen, digestivo':'', 'genitourinario':'', 'extremidades, oesteoarticular':'', u'neurológico':'', 'generales':'', 'mentales':''})
+        self.examenFisico = PersistentMapping({'peso':'', 'talla':'', 'fr':'', 'fc':'', 'ta':''})
+        self.cheqOrganos = PersistentMapping({'cabeza':'', u'tórax':'', 'abdomen':'', 'extremidades':'', u'neurológico':''})
+        transaction.commit()
+
+class Historia(persistent.Persistent):
+    def adicionarConsulta(self,consulta):
+        self.consultas[str(date.today())] = consulta
+        transaction.commit()
+    def adicionarAntecedentes(self,antecedentesDict):
+        for key, item in antecedentesDict.items():
+            self.antecedentes[key] = item
+        transaction.commit()
+    def mostrarAntecedentes(self):
+        for key, item in self.antecedentes.items():
+            print(key, item)
+    def __init__(self, numero):
+        self.numero = numero
+        self.fechaApertura = str(date.today())
+        self.antecedentes=PersistentMapping({u'patológicos':"", u'quirúrgicos':'', u'traumáticos':'', u'toxicoalérgicos':'', u'ginecoobstétricos':'', u'familiares':'', u'medicamentos':''})
+        self.consultas = BTree()
+        transaction.commit()
+
+class Paciente(persistent.Persistent):
+    def cambiarDatos(self, dato_key, dato_value):
+        self.datosPersonales[dato_key]=dato_value
+    def crearHistoria(self):
+        self.historia = Historia(self.datosPersonales['id'])
+    def __init__(self):
+        self.datosPersonales = PersistentMapping({'nombre':'', 'id':00000, 'email':'', 'telefono':'', 'direccion':'', 'procedencia':'', 'fechaNacimiento':'', 'edad':99, 'lugarNacimiento':'', 'sexo':'', 'eps':''})
+        #self.datosPersonales = BTree()
+        #self.datosPersonales.update({'nombre':'', 'id':'', 'email':'', 'telefono':'', 'direccion':'', 'procedencia':'', 'fechaNacimiento':'', 'edad':99, 'lugarNacimiento':'', 'sexo':'', 'eps':''})
+        transaction.commit()
 class Application(Frame):
+
+
     def showDoneMsg(self,message):
         popUp = Toplevel()
         popUp.title('Hecho')
@@ -25,34 +74,45 @@ class Application(Frame):
     def clearNameField(self):
         self.NOMBRE.delete(0,END)
     def createConnectionToDB(self):
-        import pandas as pd
-        import sqlite3
-        cnx = sqlite3.connect('../historias.db')
-        df = pd.read_sql_query("SELECT * FROM historias", cnx)
-        return df
+        storage = ZODB.FileStorage.FileStorage('pacientes.fs')
+        db = ZODB.DB(storage)
+        connection = db.open()
+        root = connection.root
+        if not hasattr(root, 'pacientes'):
+            root.pacientes = BTree()
+        return root
+
     def getHistoryFromName(self):
-        df = self.createConnectionToDB()
+        root = self.root
         nStr = self.NOMBRE.get()
         try:
             if nStr =="":
-                raise NameError('ERROR: Por favor ingrese un nombre para el paciente.')
-            elif not df['Nombre'].str.contains(nStr).any():
+                raise NameError('ERROR: Ingrese un nombre para el paciente.')
+            elif not root.pacientes.has_key(nStr):
                 raise NameError('ERROR: El paciente no existe en la base de datos')
-            datosPaciente=df[df['Nombre'].str.contains(nStr, na=False)].reset_index(drop=True)
-            datosPaciente['Cedula'][0]
+            paciente= root.pacientes[nStr]
+            historia = paciente.historia
             archivoHistorias = open(self.SRCDIR+"historia_"+nStr.replace(' ','')+".txt", "w", encoding='latin-1')
-            archivoHistorias.write(u'Historia del paciente %s, ID %i:\n'%(nStr, datosPaciente['Cedula'][0]))
-            fechas = datosPaciente['Fecha'].values
-            tratamientos = datosPaciente['Tratamiento'].values
-            efisico = datosPaciente['Examen Fisico'].values
-            diagnostico = datosPaciente['Diagnostico'].values
-            antecedentes = datosPaciente['Antecedentes'].values
-            sintomas = datosPaciente['Sintomas'].values
-            for i in range(len(fechas)):
-                if i==0:
-                    archivoHistorias.write('\subsection*{'+str(fechas[i])+':}'+'\n \subsubsection*{Antecedentes:} '+str(antecedentes[i])+'\n \subsubsection*{Síntomas:} '+str(sintomas[i])+'\n \subsubsection*{Examen Físico:} '+str(efisico[i])+'\n \subsubsection*{Diagnóstico:} '+str(diagnostico[i])+'\n \subsubsection*{Tratamiento:} ' + str(tratamientos[i])+'\n')
-                else:
-                    archivoHistorias.write('\subsection*{'+str(fechas[i])+':}'+'\n \subsubsection*{Síntomas:} '+str(sintomas[i])+'\n \subsubsection*{Examen Físico:} '+str(efisico[i])+'\n \subsubsection*{Diagnóstico:} '+str(diagnostico[i])+'\n \subsubsection*{Tratamiento:} ' + str(tratamientos[i])+'\n')
+            archivoHistorias.write(u'Historia del Paciente: %s, ID %s:\n'%(nStr, paciente.datosPersonales['id']))
+            archivoHistorias.write(u'Fecha de creación: %s'%historia.fechaApertura)
+            archivoHistorias.write(u'\section*{Antecedentes}')
+            for tipo, antecedente in historia.antecedentes.items():
+                archivoHistorias.write('\item \\textbf{%s}: %s'%(tipo.capitalize(), antecedente.capitalize()))
+            for fecha, consulta in historia.consultas.items():
+                archivoHistorias.write(u'\section*{Consulta de %s}'%fecha)
+                archivoHistorias.write(u'\\textbf{Motivo:} %s'%consulta.motivo)
+                archivoHistorias.write(u'\subsection*{Revisión Sistemas}')
+                for key, value in consulta.revisionSistemas.items():
+                    archivoHistorias.write(u'\\textbf{%s:} %s\n'%(key.capitalize(), value.capitalize()))
+                archivoHistorias.write(u'\subsection*{Examen Físico}')
+                for key, value in consulta.examenFisico.items():
+                    archivoHistorias.write(u'\\textbf{%s:} %s\n'%(key.capitalize(), value.capitalize()))
+                archivoHistorias.write(u'\subsection*{Chequeo Órganos}')
+                for key, value in consulta.cheqOrganos.items():
+                    archivoHistorias.write(u'\\textbf{%s:} %s\n'%(key.capitalize(), value.capitalize()))
+                archivoHistorias.write(u'\\textbf{Diagnóstico:} %s\n'%consulta.diagnostico)
+                archivoHistorias.write(u'\\textbf{Tratamiento:} %s'%consulta.tratamiento.replace(' ', '\n'))
+
             archivoHistorias.close()
 
             head = open(self.RESDIR+'headHist.txt','r',encoding='latin-1')
@@ -84,21 +144,25 @@ class Application(Frame):
             self.showErrorMsg(u'ERROR: El paciente no existe.')
 
     def getFormulaFromName(self):
-        df = self.createConnectionToDB()
+        root = self.root
         nStr = self.NOMBRE.get()
         try:
             if nStr =="":
                 raise NameError('ERROR: Ingrese un nombre para el paciente.')
-            elif not df['Nombre'].str.contains(nStr).any():
+            elif not root.pacientes.has_key(nStr):
                 raise NameError('ERROR: El paciente no existe en la base de datos')
-            datosPaciente=df[df['Nombre'].str.contains(nStr, na=False)].reset_index(drop=True)
-            datosPaciente['Cedula'][0]
-            archivoFormulas = open(self.SRCDIR+"formula_"+nStr.replace(' ','')+".txt", "w")
-            archivoFormulas.write(u'Paciente: %s, ID %i:\n'%(nStr, datosPaciente['Cedula'][0]))
-            formulasNoVacias = datosPaciente['Formula'].values[datosPaciente['Formula'].values!=None]
-            if len(formulasNoVacias)==0:
+            paciente= root.pacientes[nStr]
+
+            archivoFormulas = open(self.SRCDIR+"formula_"+nStr.replace(' ','')+".txt", "w", encoding='latin-1')
+            archivoFormulas.write(u'Paciente: %s, ID %s:\n'%(nStr, paciente.datosPersonales['id']))
+            consultas = paciente.historia.consultas
+            print(consultas.has_key(str(date.today())))
+            if len(consultas)==0:
                 raise IndexError(u'Aún no existen fórmulas para el paciente.')
-            archivoFormulas.write(formulasNoVacias[len(formulasNoVacias)-1])
+            fechas = [datetime.strptime(dstr, '%Y-%m-%d') for dstr in consultas.keys()]
+            ultimaConsulta = max(fechas)
+            ultimaFormula = consultas[str(ultimaConsulta.date())].tratamiento
+            archivoFormulas.write(ultimaFormula)
             archivoFormulas.close()
 
             head = open(self.RESDIR+'head.txt','r',encoding='latin-1')
@@ -128,6 +192,152 @@ class Application(Frame):
         except NameError as ne:
             self.showErrorMsg(ne.args[0])
 
+    def adicionarPaciente(self, datos_dict, root):
+        datoGet = {dato:datos_dict[dato].get() for dato in datos_dict.keys()}
+        try:
+            if root.pacientes.has_key(datoGet['nombre']):
+                raise NameError('Ya existe un paciente con el nombre: %s'%datoGet['nombre'])
+            root.pacientes[datoGet['nombre']] = Paciente()
+            for datoKey, datoVal in datoGet.items():
+                root.pacientes[datoGet['nombre']].datosPersonales[datoKey] = datoVal
+            transaction.commit()
+            self.crearHistoriaWindow(root.pacientes[datoGet['nombre']])
+        except NameError as ne:
+            self.showErrorMsg(ne.args[0])
+    def test(self):
+        root = self.root
+        root.pacientes['Jane Doe'].historia.mostrarAntecedentes()
+    def modificarPaciente(self, datos_dict, root):
+        datoGet = {dato:datos_dict[dato].get() for dato in datos_dict.keys()}
+        try:
+            if not root.pacientes.has_key(datoGet['nombre']):
+                raise NameError('No existe un paciente con el nombre: %s para ser modificado'%datoGet['nombre'])
+            root.pacientes[datoGet['nombre']] = Paciente()
+            for datoKey, datoVal in datoGet.items():
+                root.pacientes[datoGet['nombre']].datosPersonales[datoKey] = datoVal
+            transaction.commit()
+            self.showDoneMsg('El paciente %s ha sido modificado con exito'%datoGet['nombre'])
+        except NameError as ne:
+            self.showErrorMsg(ne.args[0])
+    def adicionarAntecedentes(self, antec_dict, paciente):
+        datoGet = {dato:antec_dict[dato].get() for dato in antec_dict.keys()}
+        paciente.historia.adicionarAntecedentes(datoGet)
+        self.showDoneMsg('El paciente %s ha sido agregado con exito'%paciente.datosPersonales['nombre'])
+    def adicionarPacienteWindow(self):
+        root = self.root
+        dummyPaciente = Paciente()
+        datos = dummyPaciente.datosPersonales.keys()
+        popUp = Toplevel()
+        popUp.title('Adicionar Paciente')
+        datoLabels = [Label(popUp, text=dato.capitalize()) for dato in datos]
+        datoSpaces = {dato:Entry(popUp) for dato in datos}
+        [label.grid(row=2+i, column=1) for i, label in enumerate(datoLabels)]
+        [space.grid(row=2+i, column=2) for i, space in enumerate(datoSpaces.values())]
+        passFunc = lambda : self.adicionarPaciente(datoSpaces, root)
+        adicionarPacienteButton = Button(popUp, text='Adicionar', command = passFunc)
+        adicionarPacienteButton.grid(row = len(datos)+2, column = 1)
+        closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
+        closeButton.grid(row=len(datos)+2, column=2)
+    def modificarPacienteWindow(self):
+        root = self.root
+        dummyPaciente = Paciente()
+        datos = dummyPaciente.datosPersonales.keys()
+        popUp = Toplevel()
+        popUp.title('Modificar Paciente')
+        datoLabels = [Label(popUp, text=dato.capitalize()) for dato in datos]
+        datoSpaces = {dato:Entry(popUp) for dato in datos}
+        [label.grid(row=2+i, column=1) for i, label in enumerate(datoLabels)]
+        [space.grid(row=2+i, column=2) for i, space in enumerate(datoSpaces.values())]
+        passFunc = lambda : self.modificarPaciente(datoSpaces, root)
+        modificarPacienteButton = Button(popUp, text='Modificar', command = passFunc)
+        modificarPacienteButton.grid(row = len(datos)+2, column = 1)
+        closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
+        closeButton.grid(row=len(datos)+2, column=2)
+    def crearHistoriaWindow(self, paciente):
+        root = self.root
+        paciente.crearHistoria()
+        datos = paciente.historia.antecedentes.keys()
+        popUp = Toplevel()
+        popUp.title('Adicionar Antecedentes para %s'%paciente.datosPersonales['nombre'])
+        datoLabels = [Label(popUp, text=dato.capitalize()) for dato in datos]
+        datoSpaces = {dato:Entry(popUp) for dato in datos}
+        [label.grid(row=2+i, column=1) for i, label in enumerate(datoLabels)]
+        [space.grid(row=2+i, column=3) for i, space in enumerate(datoSpaces.values())]
+        passFunc = lambda : self.adicionarAntecedentes(datoSpaces, paciente)
+        adicionarAntecedentesButton = Button(popUp, text='Adicionar', command = passFunc)
+        adicionarAntecedentesButton.grid(row = len(datos)+2, column = 1)
+        closeButton = Button(popUp,text='Cerrar', command=popUp.destroy)
+        closeButton.grid(row=len(datos)+2, column=3)
+    def guardarConsulta(self, consulta, info):
+        motivo = info[0]
+        consulta.motivo = motivo
+        toFill = [consulta.revisionSistemas, consulta.examenFisico, consulta.cheqOrganos]
+        for dic, targ in zip(info[1:-2], toFill):
+            dictGet = {key:dic[key].get(1.0, END) for key in dic.keys()}
+            for key, value in dictGet.items():
+                targ[key] = value
+        diagnost = info[-2]
+        tratam = info[-1]
+        consulta.diagnostico = diagnost
+        consulta.tratamiento = tratam
+
+        transaction.commit()
+        self.showDoneMsg(u'La consulta se ha guardado con éxito.\nPuede cerrar la ventana')
+        return consulta
+    def crearNuevaConsultaWindow(self):
+        root = self.root
+        nombre = self.NOMBRE.get()
+        try:
+            if nombre=='':
+                raise NameError("Por favor introduzca un nombre para el paciente.")
+            elif not root.pacientes.has_key(nombre):
+                raise NameError("El paciente no existe en la base de datos.")
+            paciente = root.pacientes[nombre]
+            consulta = Consulta()
+            rS = consulta.revisionSistemas.keys()
+            eF = consulta.examenFisico.keys()
+            cO = consulta.cheqOrganos.keys()
+            popUp = Toplevel()
+            popUp.title('Consulta de %s, el %s'%(nombre, consulta.fecha))
+            motivoLabel = Label(popUp, text = 'Motivo', font='Helvetica 18 bold')
+            motivoLabel.grid(row=2, column=1)
+            motivoSpace = ScrolledText(popUp, height=2, width=30)
+            motivoSpace.grid(row=2, column=2)
+            rSTitle = Label(popUp, text = u'Revisión Sistemas', font='Helvetica 18 bold')
+            rSTitle.grid(row=3, column = 1)
+            rSLabels = [Label(popUp, text=dato.capitalize()) for dato in rS]
+            rSSpaces = {dato:ScrolledText(popUp, height=2, width=30) for dato in rS}
+            [label.grid(row=4+i, column=1) for i, label in enumerate(rSLabels)]
+            [space.grid(row=4+i, column=2) for i, space in enumerate(rSSpaces.values())]
+
+            eFTitle = Label(popUp, text = u'Examen Físico', font='Helvetica 18 bold')
+            eFTitle.grid(row=3, column = 3)
+            eFLabels = [Label(popUp, text=dato.capitalize()) for dato in eF]
+            eFSpaces = {dato:ScrolledText(popUp, height=2, width=30) for dato in eF}
+            [label.grid(row=4+i, column=3) for i, label in enumerate(eFLabels)]
+            [space.grid(row=4+i, column=4) for i, space in enumerate(eFSpaces.values())]
+
+
+            cOTitle = Label(popUp, text = u'Chequeo Órganos', font='Helvetica 18 bold')
+            cOTitle.grid(row=3, column = 5)
+            cOLabels = [Label(popUp, text=dato.capitalize()) for dato in cO]
+            cOSpaces = {dato:ScrolledText(popUp, height=2, width=30) for dato in cO}
+            [label.grid(row=4+i, column=5) for i, label in enumerate(cOLabels)]
+            [space.grid(row=4+i, column=6) for i, space in enumerate(cOSpaces.values())]
+
+            diagLabel = Label(popUp, text = u'Diagnóstico', font='Helvetica 18 bold')
+            diagLabel.grid(row = 5 + len(rS) , column = 1)
+            diagSpace = ScrolledText(popUp, height=2, width=30)
+            diagSpace.grid(row = 5 + len(rS), column = 2)
+            tratamLabel = Label(popUp, text = 'Tratamiento', font='Helvetica 18 bold')
+            tratamLabel.grid(row = 5 + len(rS), column = 3)
+            tratamSpace = ScrolledText(popUp, height=2, width=30)
+            tratamSpace.grid(row = 5 + len(rS), column = 4)
+            toDo = lambda: paciente.historia.adicionarConsulta(self.guardarConsulta(consulta, [motivoSpace.get(1.0, END), rSSpaces, eFSpaces, cOSpaces, diagSpace.get(1.0, END), tratamSpace.get(1.0, END)]))
+            allSave = Button(popUp, text='Guardar', command = toDo, font='Helvetica 18 bold')
+            allSave.grid(row= 5 + len(rS), column = 5)
+        except NameError as ne:
+            self.showErrorMsg(ne.args[0])
 
 
 
@@ -141,12 +351,20 @@ class Application(Frame):
         self.GENHIST = Button(self, text='Historia', command=self.getHistoryFromName)
         self.GENHIST.grid(row=3, column = 3)
 
-        self.GENFORM = Button(self, text='Formula', command=self.getFormulaFromName)
+        self.GENFORM = Button(self, text=u'Fórmula', command=self.getFormulaFromName)
         self.GENFORM.grid(row=3, column = 4)
+
+        self.CRCONSULTA = Button(self, text='Nueva Consulta', command = self.crearNuevaConsultaWindow)
+        self.CRCONSULTA.grid(row = 4, column = 4)
 
         self.LIMPIAR = Button(self, text='Limpiar', command = self.clearNameField)
         self.LIMPIAR.grid(row = 2, column=4)
 
+        self.ADDPACIENTE = Button(self, text='Adicionar Paciente', command= self.adicionarPacienteWindow)
+        self.ADDPACIENTE.grid(row = 4, column = 1)
+
+        self.MODPACIENTE = Button(self, text='Modificar Paciente', command= self.modificarPacienteWindow)
+        self.MODPACIENTE.grid(row = 4, column = 3)
 
         self.QUIT = Button(self)
         self.QUIT["text"] = "Salir"
@@ -155,18 +373,22 @@ class Application(Frame):
 
         self.QUIT.grid(row=3, column = 1)
 
-
-
+    SRCDIR = './'
+    RESDIR = './res/'
+    name = ""
 
     def __init__(self, master=None):
+        self.root=self.createConnectionToDB()
         Frame.__init__(self, master)
-        self.SRCDIR = './'
-        self.RESDIR = './res/'
-        self.name = StringVar()
+        #default_font = master.nametofont("TkDefaultFont")
+        #default_font.configure(size=48)
+        master.option_add( "*font", "Arial 14 bold" )
+
         master.title("Generar Documentos")
-        master.geometry('400x100')
+        master.geometry('700x400')
         self.pack()
         self.createWidgets()
+
 
 root = Tk()
 app = Application(root)

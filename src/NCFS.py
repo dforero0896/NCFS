@@ -394,3 +394,4 @@ root = Tk()
 app = Application(root)
 app.mainloop()
 root.destroy()
+#TODO: Fancy python string tamplates for both documents. Include all patients' data in the history.
